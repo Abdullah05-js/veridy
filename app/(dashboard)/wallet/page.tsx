@@ -1,55 +1,58 @@
 "use client";
 
 import { SwapInterface } from "@/components/wallet/swap-interface";
-import { Button } from "@/components/ui/button";
-import { Copy, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { Copy, ArrowUpRight, ArrowDownLeft, Loader2 } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { getBalanceUSDT, getUsdtTransfers } from "@/lib/wdk";
+import { getBalanceUSDT, getUsdtTransfers, wdkService } from "@/lib/wdk";
 import { TokenTransfer } from "@/lib/types";
 
 export default function WalletPage() {
-  const { address } = useWallet();
+  const { address, isConnected } = useWallet();
   const { toast } = useToast();
-  const [Balance, setBalance] = useState<string | number>("loading...");
-  const [Transferms, setTransferms] = useState<TokenTransfer[]>([]);
-  
+  const [balance, setBalance] = useState<string | number | null>(null);
+  const [transfers, setTransfers] = useState<TokenTransfer[] | null>(null);
+
+  const fetchStats = useCallback(async (currentAddress: string) => {
+    try {
+      const [balanceData, transfersData] = await Promise.all([
+        getBalanceUSDT(currentAddress),
+        getUsdtTransfers(currentAddress),
+      ]);
+
+      setBalance(balanceData || "0");
+      setTransfers(transfersData || []);
+    } catch (error) {
+      console.error("Failed to fetch stats:", error);
+      // Don't show toast on every poll error to avoid spamming
+    }
+  }, []);
+
+  // Initial fetch and polling
   useEffect(() => {
     if (!address) return;
 
-    const timer = setInterval(async () => {
-      try {
-        const balance = await getBalanceUSDT(address);
-        if (!balance) {
-          return;
-        }
-        setBalance(balance);
-      } catch (error) {
-        toast.error((error as Error).message);
-      }
+    // Immediate fetch
+    fetchStats(address);
+
+    const timer = setInterval(() => {
+      fetchStats(address);
     }, 4000);
 
     return () => clearInterval(timer);
-  }, [address]);
+  }, [address, fetchStats]);
 
-  useEffect(() => {
-    if (!address) return;
-
-    const timer = setInterval(async () => {
-      try {
-        const transfers = await getUsdtTransfers(address);
-        if (!transfers) {
-          return;
-        }
-        setTransferms(transfers);
-      } catch (error) {
-        toast.error((error as Error).message);
-      }
-    }, 4000);
-
-    return () => clearInterval(timer);
-  }, [address]);
+  if (!address) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+        <div className="text-muted-foreground font-mono text-sm">
+          Initializing wallet...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
@@ -59,14 +62,26 @@ export default function WalletPage() {
           <h1 className="text-sm font-medium uppercase tracking-widest text-muted-foreground">
             Total Balance
           </h1>
-          <div className="text-6xl md:text-8xl font-bold font-display text-high-viz-yellow tracking-tighter">
-            ${Balance}
+          <div className="flex justify-center items-center min-h-[6rem] md:min-h-[8rem]">
+            {balance === null ? (
+              <div className="animate-pulse flex flex-col items-center gap-4 w-full max-w-xs">
+                <div className="h-16 md:h-24 bg-neutral-900 rounded w-full"></div>
+              </div>
+            ) : (
+              <div className="text-6xl md:text-8xl font-bold font-display text-high-viz-yellow tracking-tighter">
+                ${balance}
+              </div>
+            )}
           </div>
+
           <div className="flex items-center justify-center gap-2 text-muted-foreground font-mono text-sm">
             <span>{address}</span>
             <Copy
-              className="w-3 h-3 cursor-pointer hover:text-white"
-              onClick={() => navigator.clipboard.writeText(address!)}
+              className="w-3 h-3 cursor-pointer hover:text-white transition-colors"
+              onClick={() => {
+                navigator.clipboard.writeText(address!);
+                toast.success("Address copied to clipboard");
+              }}
             />
           </div>
         </div>
@@ -76,7 +91,7 @@ export default function WalletPage() {
         {/* Left: Swap Interface */}
         <div className="p-8 lg:border-r border-neutral-800 flex items-start justify-center">
           <div className="w-full max-w-md">
-            <SwapInterface balance={Balance} />
+            <SwapInterface balance={balance === null ? "..." : balance} />
           </div>
         </div>
 
@@ -88,7 +103,7 @@ export default function WalletPage() {
               Your Assets
             </h3>
             <div className="space-y-4">
-              <div className="flex justify-between items-center p-4 border border-neutral-800 bg-neutral-900/50">
+              <div className="flex justify-between items-center p-4 border border-neutral-800 bg-neutral-900/50 hover:bg-neutral-900 transition-colors">
                 <div className="flex items-center gap-3">
                   <span className="text-xl">₮</span>
                   <div>
@@ -99,9 +114,13 @@ export default function WalletPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-muted-foreground">
-                    ${Balance}
-                  </div>
+                  {balance === null ? (
+                    <div className="h-4 w-16 bg-neutral-800 animate-pulse rounded"></div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">
+                      ${balance}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -116,49 +135,74 @@ export default function WalletPage() {
             </div>
 
             <div className="space-y-0">
-              {Transferms.map((tx, index) => {
-                const isIncoming =
-                  tx.to.toLowerCase() === address!.toLowerCase(); // your wallet
-                const timeAgo = new Date(tx.timestamp * 1000).toLocaleString();
-
-                return (
+              {transfers === null ? (
+                // Loading Skeletons
+                Array.from({ length: 3 }).map((_, i) => (
                   <div
-                    key={index}
-                    className="flex justify-between items-center py-4 border-b border-neutral-800 last:border-0"
+                    key={i}
+                    className="flex justify-between items-center py-4 border-b border-neutral-800 last:border-0 animate-pulse"
                   >
-                    {/* Left section */}
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-neutral-900 border border-neutral-800">
-                        {isIncoming ? (
-                          <ArrowDownLeft className="w-4 h-4 text-green-500" />
-                        ) : (
-                          <ArrowUpRight className="w-4 h-4 text-red-500" />
-                        )}
-                      </div>
-
-                      <div>
-                        <div className="font-bold text-sm uppercase">
-                          {isIncoming ? "Received" : "Sent"}
-                        </div>
-
-                        <div className="text-xs text-muted-foreground font-mono">
-                          {tx.from.slice(0, 6)}...{tx.from.slice(-4)} •{" "}
-                          {timeAgo}
-                        </div>
+                      <div className="w-8 h-8 bg-neutral-900 rounded-none"></div>
+                      <div className="space-y-2">
+                        <div className="h-3 w-20 bg-neutral-900 rounded"></div>
+                        <div className="h-2 w-32 bg-neutral-900 rounded"></div>
                       </div>
                     </div>
-
-                    {/* Amount */}
-                    <div
-                      className={`font-mono text-sm ${
-                        isIncoming ? "text-green-500" : "text-red-500"
-                      }`}
-                    >
-                      {isIncoming ? "+" : "-"} {tx.amount} USDT
-                    </div>
+                    <div className="h-3 w-16 bg-neutral-900 rounded"></div>
                   </div>
-                );
-              })}
+                ))
+              ) : transfers.length === 0 ? (
+                <div className="text-muted-foreground text-sm py-8 text-center italic">
+                  No recent transactions
+                </div>
+              ) : (
+                transfers.map((tx, index) => {
+                  const isIncoming =
+                    tx.to.toLowerCase() === address!.toLowerCase(); // your wallet
+                  const timeAgo = new Date(
+                    tx.timestamp * 1000
+                  ).toLocaleString();
+
+                  return (
+                    <div
+                      key={index}
+                      className="flex justify-between items-center py-4 border-b border-neutral-800 last:border-0 hover:bg-neutral-900/30 transition-colors px-2 -mx-2"
+                    >
+                      {/* Left section */}
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-neutral-900 border border-neutral-800">
+                          {isIncoming ? (
+                            <ArrowDownLeft className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <ArrowUpRight className="w-4 h-4 text-red-500" />
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="font-bold text-sm uppercase">
+                            {isIncoming ? "Received" : "Sent"}
+                          </div>
+
+                          <div className="text-xs text-muted-foreground font-mono">
+                            {tx.from.slice(0, 6)}...{tx.from.slice(-4)} •{" "}
+                            {timeAgo}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Amount */}
+                      <div
+                        className={`font-mono text-sm ${
+                          isIncoming ? "text-green-500" : "text-red-500"
+                        }`}
+                      >
+                        {isIncoming ? "+" : "-"} {tx.amount} USDT
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

@@ -1,19 +1,32 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useWalletStore } from "@/lib/store";
 import { toast } from "@/components/ui/toast";
 import { useRouter } from "next/navigation";
+import { wdkService } from "@/lib/wdk";
 
 export function useWallet() {
   const { wallet, setWallet, disConnect: disconnect } = useWalletStore();
-  console.log(wallet);
   const router = useRouter()
+
+  // Initialize WDK service if wallet exists in store
+  useEffect(() => {
+    if (wallet?.seed && !wdkService.wdk) {
+      try {
+        wdkService.initialize(wallet.seed);
+      } catch (error) {
+        console.error("Failed to re-initialize wallet:", error);
+        // Optionally clear invalid wallet from store
+        // disconnect(); 
+      }
+    }
+  }, [wallet]);
  
   const disConnect = useCallback(async () => {
     try {
       if (!wallet) {
-        toast.info("Wallet already disConnected");
+        toast.info("Wallet already disconnected");
         return;
       }
       disconnect()
@@ -21,12 +34,9 @@ export function useWallet() {
 
     } catch (error) {
       console.error(error);
-      toast.error("Failed to connect wallet");
+      toast.error("Failed to disconnect wallet");
     }
-  }, [wallet, setWallet]);
-
-
-
+  }, [wallet, disconnect, router]);
 
   return {
     isConnected: !!wallet,

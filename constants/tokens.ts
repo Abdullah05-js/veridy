@@ -1,4 +1,4 @@
-import { sepolia,arbitrum } from "viem/chains";
+import { arbitrum } from "viem/chains";
 import { Address } from "viem";
 export const SWAP_TOKENS = [
   {

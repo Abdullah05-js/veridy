@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,54 +10,85 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowDown, Settings } from "lucide-react";
+import { ArrowDown, Settings, Loader2 } from "lucide-react";
 import { SWAP_TOKENS, USDT_TOKEN } from "@/constants/tokens";
-import { getSwapQuote, executeSwap } from "@/lib/swap";
-import { toast } from "@/components/ui/toast";
+import { executeSwap, getMockQuote, getCurrentMockPrice, USE_MOCK_SWAP } from "@/lib/swap";
 import Image from "next/image";
 import { formatUnits, parseUnits } from "viem";
 import { useToast } from "@/hooks/use-toast";
 
 export function SwapInterface({ balance }: { balance: string | number }) {
-  const [fromToken, setFromToken] = useState<any>(SWAP_TOKENS[0]);
+  const [fromToken, setFromToken] = useState<(typeof SWAP_TOKENS)[number]>(SWAP_TOKENS[0]);
   const [amount, setAmount] = useState("");
-  const [quote, setQuote] = useState<string | null>(null);
   const [isSwapping, setIsSwapping] = useState(false);
+  const [lastSwapResult, setLastSwapResult] = useState<string | null>(null);
+  const [currentRate, setCurrentRate] = useState<number>(0);
   const { toast } = useToast();
+
+  // Update rate periodically for realistic price display (mock mode only)
   useEffect(() => {
-    if (amount && parseFloat(amount) > 0) {
-      const timer = setTimeout(async () => {
-        const amountFormated = parseUnits(amount, fromToken.decimals);
-        const q = await getSwapQuote(
-          fromToken.address,
-          USDT_TOKEN.address,
-          amountFormated
-        );
-        setQuote(formatUnits(q.outputAmount, USDT_TOKEN.decimals));
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      setQuote(null);
+    if (!USE_MOCK_SWAP) return;
+    
+    const updateRate = () => {
+      const rate = getCurrentMockPrice(fromToken.symbol);
+      setCurrentRate(rate);
+    };
+    
+    updateRate();
+    const interval = setInterval(updateRate, 10000); // Update every 10 seconds (synced with price update)
+    
+    return () => clearInterval(interval);
+  }, [fromToken.symbol]);
+
+  // Calculate estimated output based on current rate (mock mode)
+  const estimatedOutput = useMemo(() => {
+    if (!USE_MOCK_SWAP || !amount || parseFloat(amount) <= 0) return null;
+    
+    try {
+      const amountBigInt = parseUnits(amount, fromToken.decimals);
+      const { outputAmount } = getMockQuote(fromToken.address, amountBigInt);
+      return formatUnits(outputAmount, USDT_TOKEN.decimals);
+    } catch {
+      return null;
     }
-  }, [amount, fromToken]);
+  }, [amount, fromToken, currentRate]);
 
   const handleSwap = async () => {
-    if (!amount || !quote) return;
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
 
     setIsSwapping(true);
+    setLastSwapResult(null);
+    
     try {
-      const formatedIN = parseUnits(amount, fromToken.decimals as number);
-      const hash = await executeSwap(
+      const formattedAmount = parseUnits(amount, fromToken.decimals);
+      const result = await executeSwap(
         fromToken.address,
         USDT_TOKEN.address,
-        formatedIN
+        formattedAmount
       );
+      
+      const outputFormatted = formatUnits(result.outputAmount, USDT_TOKEN.decimals);
+      setLastSwapResult(outputFormatted);
+      
       toast.success(
-        `Swapped ${amount} ${fromToken} to ${quote} USDT successfully! 
-        See on Arbiscan: https://arbiscan.io/tx/${hash}`
+        `Swapped ${amount} ${fromToken.symbol} to ${parseFloat(outputFormatted).toFixed(4)} USDT!`,
+        {
+          description: (
+            <a 
+              href={`https://arbiscan.io/tx/${result.hash}`} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="underline"
+            >
+              View on Arbiscan
+            </a>
+          )
+        }
       );
       setAmount("");
-      setQuote(null);
     } catch (error) {
       toast.error("Swap failed. Please try again.");
       console.error(error);
@@ -65,6 +96,13 @@ export function SwapInterface({ balance }: { balance: string | number }) {
       setIsSwapping(false);
     }
   };
+
+  // Determine what to show in output field
+  const outputDisplay = useMemo(() => {
+    if (lastSwapResult) return parseFloat(lastSwapResult).toFixed(4);
+    if (USE_MOCK_SWAP && estimatedOutput) return `~${parseFloat(estimatedOutput).toFixed(4)}`;
+    return "—";
+  }, [lastSwapResult, estimatedOutput]);
 
   return (
     <div className="border border-neutral-800 bg-neutral-950 p-6 md:p-8">
@@ -85,7 +123,7 @@ export function SwapInterface({ balance }: { balance: string | number }) {
               From
             </label>
             <span className="text-xs font-mono text-muted-foreground">
-              Balance: 12.45
+              Balance: --
             </span>
           </div>
           <div className="flex gap-4">
@@ -95,7 +133,11 @@ export function SwapInterface({ balance }: { balance: string | number }) {
                 placeholder="0.0"
                 className="bg-transparent border-none text-2xl h-auto p-0 focus-visible:ring-0 focus-visible:border-none placeholder:text-neutral-700"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setLastSwapResult(null); // Clear last result when typing
+                }}
+                disabled={isSwapping}
               />
             </div>
             <Select
@@ -106,8 +148,10 @@ export function SwapInterface({ balance }: { balance: string | number }) {
                 );
                 if (selectedToken) {
                   setFromToken(selectedToken);
+                  setLastSwapResult(null);
                 }
               }}
+              disabled={isSwapping}
             >
               <SelectTrigger className="w-[140px] bg-neutral-900 border-neutral-700">
                 <SelectValue />
@@ -137,6 +181,7 @@ export function SwapInterface({ balance }: { balance: string | number }) {
             size="icon"
             variant="secondary"
             className="rounded-full h-8 w-8 border-neutral-800 bg-neutral-950"
+            disabled={isSwapping}
           >
             <ArrowDown className="h-4 w-4" />
           </Button>
@@ -149,16 +194,16 @@ export function SwapInterface({ balance }: { balance: string | number }) {
               To
             </label>
             <span className="text-xs font-mono text-muted-foreground">
-              Balance: {balance}
+              Balance: {typeof balance === 'number' ? balance.toFixed(2) : balance}
             </span>
           </div>
           <div className="flex gap-4">
-            <div className="flex-1">
-              <div className="text-2xl font-mono py-1 text-neutral-400">
-                {quote ? parseFloat(quote).toFixed(4) : "0.0"}
+            <div className="flex-1 flex items-center">
+              <div className={`text-2xl font-mono py-1 ${lastSwapResult ? 'text-high-viz-yellow' : 'text-neutral-400'}`}>
+                {outputDisplay}
               </div>
             </div>
-            <div className="w-[140px] h-10 flex items-center px-3 gap-2 border border-neutral-700 bg-neutral-900 text-sm">
+            <div className="w-[140px] h-10 flex items-center px-3 gap-2 border border-neutral-700 bg-neutral-900 text-sm opacity-50 cursor-not-allowed">
               <Image
                 src={USDT_TOKEN.icon}
                 width={24}
@@ -170,13 +215,12 @@ export function SwapInterface({ balance }: { balance: string | number }) {
           </div>
         </div>
 
-        {/* Price Info */}
-        {quote && (
+        {/* Rate Info */}
+        {USE_MOCK_SWAP && currentRate > 0 && (
           <div className="flex justify-between text-xs text-muted-foreground px-1 font-mono">
             <span>Rate</span>
-            <span>
-              1 {fromToken} ≈{" "}
-              {(parseFloat(quote) / parseFloat(amount)).toFixed(2)} USDT
+            <span className="tabular-nums">
+              1 {fromToken.symbol} ≈ ${currentRate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
         )}
@@ -186,9 +230,14 @@ export function SwapInterface({ balance }: { balance: string | number }) {
           size="lg"
           className="w-full mt-4"
           onClick={handleSwap}
-          disabled={!amount || isSwapping}
+          disabled={!amount || parseFloat(amount) <= 0 || isSwapping}
         >
-          {isSwapping ? "SWAPPING..." : "SWAP TO USDT"}
+          {isSwapping ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              SWAPPING...
+            </span>
+          ) : "SWAP TO USDT"}
         </Button>
       </div>
     </div>
