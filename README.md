@@ -13,6 +13,10 @@
   Files are encrypted, stored on IPFS, and protected by smart contract escrow.
 </p>
 
+<p align="center">
+  <strong>⚡ Powered by <a href="https://wallet.tether.io/">Tether WDK</a></strong>
+</p>
+
 ---
 
 ## ✨ What is Veridy?
@@ -95,9 +99,9 @@ Veridy is a peer-to-peer marketplace where anyone can sell digital files - image
 
 ### Wallet Features
 - View your USDT balance in real-time
-- Send USDT to any Ethereum address
+- Send USDT to any address
 - Track transaction history
-- Copy your wallet address easily
+- Self-custodial - your keys, your coins
 
 ---
 
@@ -138,6 +142,9 @@ To purchase files or pay for transaction fees:
 ---
 
 ## ⚙️ Technical Details
+
+### Tether WDK
+Wallet management and USDT operations are powered by [Tether WDK](https://wallet.tether.io/) - handles wallet creation, imports, transfers, and balance queries.
 
 ### Networks
 - **Arbitrum** (Production) - Fast, low-cost Ethereum L2
@@ -185,6 +192,13 @@ Store on-chain → Buyer decrypts key → Download from IPFS → Decrypt file
 
 ## 🛠️ Development
 
+### Tech Stack
+- **Frontend**: Next.js 16, React 19, Tailwind CSS
+- **Wallet**: Tether WDK (`@tetherto/wdk`, `@tetherto/wdk-wallet-evm`)
+- **Blockchain**: Viem, Arbitrum
+- **Storage**: IPFS (Pinata)
+- **State**: Zustand
+
 ### Prerequisites
 - Node.js 18+
 - npm or yarn
@@ -207,6 +221,7 @@ npm run dev
 ```
 NEXT_PUBLIC_PINATA_JWT=your_pinata_jwt_token
 NEXT_PUBLIC_PINATA_GATEWAY=https://gateway.pinata.cloud
+INDEXER_API_KEY=tether_wdk_indexer_api_key
 ```
 
 ### Build
@@ -225,5 +240,6 @@ npm run start
 ---
 
 <p align="center">
-  <strong>Trade digital files securely. Own your data. Powered by blockchain.</strong>
+  <strong>Trade digital files securely. Own your data.</strong><br/>
+  <em>Powered by Tether WDK & Arbitrum</em>
 </p>
