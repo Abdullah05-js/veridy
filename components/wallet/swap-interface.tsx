@@ -15,18 +15,25 @@ import { SWAP_TOKENS, USDT_TOKEN } from "@/constants/tokens";
 import { getSwapQuote, executeSwap } from "@/lib/swap";
 import { toast } from "@/components/ui/toast";
 import Image from "next/image";
+import { formatUnits, parseUnits } from "viem";
+import { useToast } from "@/hooks/use-toast";
 
 export function SwapInterface({ balance }: { balance: string | number }) {
-  const [fromToken, setFromToken] = useState(SWAP_TOKENS[0].symbol);
+  const [fromToken, setFromToken] = useState<any>(SWAP_TOKENS[0]);
   const [amount, setAmount] = useState("");
   const [quote, setQuote] = useState<string | null>(null);
   const [isSwapping, setIsSwapping] = useState(false);
-
+  const { toast } = useToast();
   useEffect(() => {
     if (amount && parseFloat(amount) > 0) {
       const timer = setTimeout(async () => {
-        const q = await getSwapQuote(fromToken, USDT_TOKEN.symbol, amount);
-        setQuote(q.outputAmount);
+        const amountFormated = parseUnits(amount, fromToken.decimals);
+        const q = await getSwapQuote(
+          fromToken.address,
+          USDT_TOKEN.address,
+          amountFormated
+        );
+        setQuote(formatUnits(q.outputAmount, USDT_TOKEN.decimals));
       }, 500);
       return () => clearTimeout(timer);
     } else {
@@ -39,9 +46,15 @@ export function SwapInterface({ balance }: { balance: string | number }) {
 
     setIsSwapping(true);
     try {
-      await executeSwap(fromToken, USDT_TOKEN.symbol, amount, 0.5);
+      const formatedIN = parseUnits(amount, fromToken.decimals as number);
+      const hash = await executeSwap(
+        fromToken.address,
+        USDT_TOKEN.address,
+        formatedIN
+      );
       toast.success(
-        `Swapped ${amount} ${fromToken} to ${quote} USDT successfully!`
+        `Swapped ${amount} ${fromToken} to ${quote} USDT successfully! 
+        See on Arbiscan: https://arbiscan.io/tx/${hash}`
       );
       setAmount("");
       setQuote(null);
@@ -85,7 +98,17 @@ export function SwapInterface({ balance }: { balance: string | number }) {
                 onChange={(e) => setAmount(e.target.value)}
               />
             </div>
-            <Select value={fromToken} onValueChange={setFromToken}>
+            <Select
+              value={fromToken.symbol}
+              onValueChange={(value) => {
+                const selectedToken = SWAP_TOKENS.find(
+                  (t) => t.symbol === value
+                );
+                if (selectedToken) {
+                  setFromToken(selectedToken);
+                }
+              }}
+            >
               <SelectTrigger className="w-[140px] bg-neutral-900 border-neutral-700">
                 <SelectValue />
               </SelectTrigger>

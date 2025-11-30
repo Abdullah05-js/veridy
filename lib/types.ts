@@ -29,12 +29,7 @@ export interface WalletData {
 }
 
 export interface SwapQuote {
-  fromToken: string;
-  toToken: string;
-  inputAmount: string;
-  outputAmount: string;
-  executionPrice: string;
-  priceImpact: string;
+  outputAmount: bigint;
 }
 
 

@@ -1,4 +1,4 @@
-import { sepoliaConfigPimlico, CHAIN } from "@/constants/tokens";
+import { CHAIN } from "@/constants/tokens";
 import { TokenTransfer, WalletData } from "./types";
 import WDK from '@tetherto/wdk'
 import WalletManagerEvm from '@tetherto/wdk-wallet-evm'
@@ -31,13 +31,11 @@ const initializedWDK = (seedPhrase: string): InitProviders => {
       })
 
     }
-    const wallet = (new WDK(seedPhrase)).registerWallet('ethereum', WalletManagerEvm, sepoliaConfigPimlico)
-    const account = new WalletAccountEvm(seedPhrase, "0'/0/0", {
-      provider: 'https://ethereum-rpc.publicnode.com'
-    })
 
-    // Create swap service
-    swapProtocol = new veloraProtocolEvm(account)
+    const wallet = (new WDK(seedPhrase)).registerWallet('ethereum', WalletManagerEvm,  {
+    provider: 'https://arb1.arbitrum.io/rpc'
+  })
+
 
     return {
       wallet,

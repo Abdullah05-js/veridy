@@ -33,20 +33,21 @@ export type Token = typeof SWAP_TOKENS[number] | typeof USDT_TOKEN;
 export const CHAIN = arbitrum
 export const RPC_URL = CHAIN.rpcUrls.default.http[0]
 export const USDT_CONTRACT_ADDRESS: Address = "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"
-export const sepoliaConfigPimlico = {
-  chainId: CHAIN.id,
-  blockchain: 'arbitrum',
-  provider: RPC_URL,
-  bundlerUrl: 'https://public.pimlico.io/v2/42161/rpc',
-  paymasterUrl: 'https://public.pimlico.io/v2/42161/rpc',
-  paymasterAddress: '0x777777777777AeC03fd955926DbF81597e66834C',
-  entryPointAddress: '0x0000000071727De22E5E9d8BAf0edAc6f37da032',
-  safeModulesVersion: '0.3.0',
-  paymasterToken: {
-    address: USDT_CONTRACT_ADDRESS
-  },
-  transferMaxFee: 100000
-}
+
+// export const sepoliaConfigPimlico = {
+//   chainId: CHAIN.id,
+//   blockchain: 'arbitrum',
+//   provider: RPC_URL,
+//   bundlerUrl: 'https://public.pimlico.io/v2/42161/rpc',
+//   paymasterUrl: 'https://public.pimlico.io/v2/42161/rpc',
+//   paymasterAddress: '0x777777777777AeC03fd955926DbF81597e66834C',
+//   entryPointAddress: '0x0000000071727De22E5E9d8BAf0edAc6f37da032',
+//   safeModulesVersion: '0.3.0',
+//   paymasterToken: {
+//     address: USDT_CONTRACT_ADDRESS
+//   },
+//   transferMaxFee: 100000
+// }
 
 
 
