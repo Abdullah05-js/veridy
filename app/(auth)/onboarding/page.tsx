@@ -23,7 +23,7 @@ export default function OnboardingPage() {
     <div className="border-2 border-neutral-800 bg-neutral-950 p-8 md:p-12 text-center shadow-2xl">
       <div className="mb-8 flex justify-center">
         <div className="h-16 w-16 bg-high-viz-yellow flex items-center justify-center rounded-none border border-pure-black shadow-[4px_4px_0px_#fff]">
-          <Shield className="h-8 w-8 text-black" />
+          <Shield className="h-8 w-8 text-secondary" />
         </div>
       </div>
 
