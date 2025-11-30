@@ -69,7 +69,19 @@ export function PurchaseModal({ isOpen, onClose, listing }: PurchaseModalProps) 
         network
       );
 
-      toast.success("Purchase request sent! Waiting for seller approval.");
+      toast.success(
+        <div>
+          Purchase request sent! Waiting for seller approval.
+          <a
+            href={`https://arbiscan.io/tx/${txHash}`}
+            target="_blank"
+            rel="noreferrer"
+            className="underline ml-2"
+          >
+            View on Arbiscan
+          </a>
+        </div>
+      );
       console.log("Purchase TX:", txHash);
       
       // Store buyer's keypair info for later decryption

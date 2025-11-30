@@ -1,12 +1,12 @@
 "use client";
 
-import { SwapInterface } from "@/components/wallet/swap-interface";
 import { Copy, ArrowUpRight, ArrowDownLeft, Loader2 } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { getBalanceUSDT, getUsdtTransfers, wdkService } from "@/lib/wdk";
+import { getBalanceUSDT, getUsdtTransfers } from "@/lib/wdk";
 import { TokenTransfer } from "@/lib/types";
+import { TransferInterface } from "@/components/wallet/transfer-interface";
 
 export default function WalletPage() {
   const { address, isConnected } = useWallet();
@@ -88,10 +88,13 @@ export default function WalletPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 grow border-b border-neutral-800">
-        {/* Left: Swap Interface */}
+        {/* Left: Transfer Interface */}
         <div className="p-8 lg:border-r border-neutral-800 flex items-start justify-center">
           <div className="w-full max-w-md">
-            <SwapInterface balance={balance === null ? "..." : balance} />
+            <TransferInterface 
+              balance={balance === null ? "..." : balance} 
+              onTransferComplete={() => address && fetchStats(address)}
+            />
           </div>
         </div>
 

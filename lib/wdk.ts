@@ -1,9 +1,16 @@
 import { CHAIN, RPC_URL } from "@/constants/tokens";
 import { TokenTransfer, WalletData } from "./types";
-import WDK from '@tetherto/wdk'
-import WalletManagerEvm, { WalletAccountEvm } from '@tetherto/wdk-wallet-evm'
-import { createPublicClient, http, createWalletClient, PublicClient, WalletClient } from 'viem'
+import WDK from "@tetherto/wdk";
+import WalletManagerEvm, { WalletAccountEvm } from "@tetherto/wdk-wallet-evm";
+import {
+  createPublicClient,
+  http,
+  createWalletClient,
+  PublicClient,
+  WalletClient,
+} from "viem";
 import { mnemonicToAccount } from "viem/accounts";
+import { USDT_ADDRESSES } from "./marketplace";
 
 class WDKService {
   private static instance: WDKService;
@@ -15,7 +22,7 @@ class WDKService {
   private constructor() {
     this.publicClient = createPublicClient({
       chain: CHAIN,
-      transport: http(RPC_URL)
+      transport: http(RPC_URL),
     });
   }
 
@@ -29,19 +36,19 @@ class WDKService {
   public initialize(seedPhrase: string) {
     try {
       this.seed = seedPhrase;
-      
+
       // Initialize Viem Wallet Client
       const account = mnemonicToAccount(seedPhrase);
       this.walletClient = createWalletClient({
         account,
         chain: CHAIN,
-        transport: http(RPC_URL)
+        transport: http(RPC_URL),
       });
 
       // Initialize WDK
       this.wdk = new WDK(seedPhrase);
-      this.wdk.registerWallet('ethereum', WalletManagerEvm, {
-        provider: RPC_URL
+      this.wdk.registerWallet("ethereum", WalletManagerEvm, {
+        provider: RPC_URL,
       });
 
       return this;
@@ -70,7 +77,7 @@ class WDKService {
       throw new Error("WDK not initialized with seed");
     }
     return new WalletAccountEvm(this.seed, "0'/0/0", {
-      provider: RPC_URL
+      provider: RPC_URL,
     });
   }
 }
@@ -82,7 +89,7 @@ export const createWallet = async (): Promise<WalletData> => {
   try {
     const seed = WDK.getRandomSeedPhrase();
     wdkService.initialize(seed);
-    
+
     const wdk = wdkService.getWDK();
     const account = await wdk.getAccount("ethereum", 0);
     const address = await account.getAddress();
@@ -100,7 +107,7 @@ export const createWallet = async (): Promise<WalletData> => {
 export const importWallet = async (seedPhrase: string): Promise<WalletData> => {
   try {
     wdkService.initialize(seedPhrase);
-    
+
     const wdk = wdkService.getWDK();
     const account = await wdk.getAccount("ethereum", 0);
     const address = await account.getAddress();
@@ -116,7 +123,9 @@ export const importWallet = async (seedPhrase: string): Promise<WalletData> => {
 
 export async function getBalanceUSDT(address: string) {
   try {
-    const res = await fetch(`/api/usdt-balance?address=${address}&chain=arbitrum`);
+    const res = await fetch(
+      `/api/usdt-balance?address=${address}&chain=arbitrum`
+    );
     const data = await res.json();
     return data.tokenBalance.amount;
   } catch (error) {
@@ -124,12 +133,39 @@ export async function getBalanceUSDT(address: string) {
   }
 }
 
-export async function getUsdtTransfers(address: string, chain = "arbitrum", token = "usdt"): Promise<TokenTransfer[]> {
+export async function getUsdtTransfers(
+  address: string,
+  chain = "arbitrum",
+  token = "usdt"
+): Promise<TokenTransfer[]> {
   try {
-    const res = await fetch(`/api/usdt-transfers?address=${address}&chain=${chain}&token=${token}`);
+    const res = await fetch(
+      `/api/usdt-transfers?address=${address}&chain=${chain}&token=${token}`
+    );
     const data = await res.json();
     return data.transfers;
   } catch (error) {
+    throw new Error((error as Error).message);
+  }
+}
+// Transfer USDT to another address
+export async function transferUSDT(
+  toAddress: string,
+  amount: bigint
+): Promise<{ hash: string }> {
+  try {
+    const wdk = wdkService.getWDK();
+    const account = await wdk.getAccount("ethereum", 0);
+
+    const transferResult = await account.transfer({
+      token: USDT_ADDRESSES.arbitrum,
+      recipient: toAddress,
+      amount, // 1 token in base units
+    });
+
+    return { hash: transferResult.hash };
+  } catch (error) {
+    console.error("Transfer error:", error);
     throw new Error((error as Error).message);
   }
 }
